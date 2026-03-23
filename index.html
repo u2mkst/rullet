@@ -2,203 +2,332 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>달리기 게임</title>
+<title>KST 시뮬레이션 룰렛</title>
 
 <style>
-body { text-align:center; background:#111; color:white; font-family:Arial; }
-canvas { background:#333; border-radius:10px; margin-top:20px; }
-
-button {
-  padding:10px 20px;
-  margin:5px;
-  border:none;
-  border-radius:10px;
-  background:#00c853;
-  color:white;
-  cursor:pointer;
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-display: swap;
 }
 
-.admin { display:none; background:#222; padding:10px; margin-top:10px; }
-
-input {
-  width:40px;
-  text-align:center;
-  margin-top:5px;
+body {
+    font-family: 'Pretendard', Arial;
+    background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    color:#fff;
+    text-align:center;
 }
+
+.glass {
+    backdrop-filter: blur(12px);
+    background: rgba(255,255,255,0.1);
+    border-radius:16px;
+    padding:15px;
+    margin:10px auto;
+    width:90%;
+}
+
+button, input {
+    padding:10px;
+    font-size:16px;
+    margin:10px;
+    border-radius:10px;
+    border:none;
+    cursor:pointer;
+}
+
+.hidden { display:none; }
+
+.track {
+    margin:4px 0;
+    background: rgba(255,255,255,0.1);
+    border-radius:10px;
+    overflow:hidden;
+}
+
+.runner {
+    height:18px;
+    line-height:18px;
+    padding-left:8px;
+    border-radius:10px;
+    background: linear-gradient(90deg,#00c6ff,#0072ff);
+    width:0%;
+    transition: width 0.08s linear;
+    font-size:12px;
+}
+
+.cards {
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:10px;
+}
+
+.card {
+    width:140px;
+    padding:12px;
+    border-radius:14px;
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    transition: transform 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-5px) scale(1.03);
+}
+
+.stack {
+    width:100%;
+    display:flex;
+    flex-direction:column-reverse;
+    gap:1px;
+    height:70px;
+    margin-top:6px;
+}
+
+.block {
+    height:3px;
+    border-radius:2px;
+    background: linear-gradient(90deg,#00f260,#0575e6);
+    animation: stackUp 0.25s ease;
+}
+
+@keyframes stackUp {
+    from { transform: translateY(10px); opacity:0; }
+    to { transform: translateY(0); opacity:1; }
+}
+
+.top1 { transform: scale(1.25); background: gold; color:#000; }
+.top2 { transform: scale(1.1); background: silver; color:#000; }
+.top3 { transform: scale(1.05); background: #cd7f32; color:#000; }
+
 </style>
 </head>
-
 <body>
 
-<h1>🏃 달리기 게임</h1>
+<h1>KST 시뮬레이션 룰렛</h1>
 
-<button onclick="startRace()">출발</button>
-<button onclick="loginAdmin()">👑 관리자</button>
-
-<canvas id="game" width="800" height="400"></canvas>
-
-<h2 id="result"></h2>
-
-<div class="admin" id="adminPanel">
-  <h3>관리자 모드</h3>
-  <div id="rankInputs"></div>
-  <br>
-  <button onclick="applyFixed()">순위 지정 적용</button>
+<div id="startScreen" class="glass">
+  <input type="number" id="roundInput" value="1000" min="1" max="1000">
+  <button onclick="startRace()">시작</button>
 </div>
 
+<div id="tracks" class="glass hidden"></div>
+
+<div id="resultSection" class="hidden">
+  <h2 id="finalTitle">📊 진행 중...</h2>
+  <div id="result" class="glass"></div>
+  <button id="retryBtn" class="hidden" onclick="goHome()">🔄 다시 하기</button>
+</div>
+
+<div id="celebration" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:bold;z-index:999;">
+  <div id="celebrationText"></div>
+</div>
+
+<style>
+@keyframes popText {
+  0% { transform: scale(0.5); opacity:0; }
+  50% { transform: scale(1.2); opacity:1; }
+  100% { transform: scale(1); }
+}
+
+.firework {
+  position:absolute;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background: gold;
+  animation: explode 0.8s ease-out forwards;
+}
+
+@keyframes explode {
+  from { transform: translate(0,0); opacity:1; }
+  to { transform: translate(var(--x), var(--y)); opacity:0; }
+}
+</style>
+
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const players = ["한이","바가","라면","진상","진지","조교","제갈태윤"];
+let winCount = {};
+players.forEach(p => winCount[p]=0);
 
-let players = [];
-let names = ["1번","2번","3번","4번","5번"];
-let finishOrder = [];
-let running = false;
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
-let useFixed = false;
-let fixedRanks = [];
+function createTracks(){
+  const tracks = document.getElementById("tracks");
+  tracks.innerHTML = "";
 
-// 기본 이름
-function resetNames(){
-  names = ["1번","2번","3번","4번","5번"];
-}
+  players.forEach(p=>{
+    const t = document.createElement("div");
+    t.className = "track";
 
-// 관리자 이름
-function setAdminNames(){
-  names = ["한이","바가","라면 진지","진상","제갈","조교"];
-}
+    const r = document.createElement("div");
+    r.className = "runner";
+    r.id = "runner_"+p;
+    r.innerText = p;
 
-// 플레이어 생성
-function createPlayers(){
-  players = [];
-  for(let i=0;i<names.length;i++){
-    players.push({ x:0, y:60+i*50, speed:0, rank:0 });
-  }
-}
-
-// 그리기
-function draw(){
-  ctx.clearRect(0,0,800,400);
-
-  ctx.fillStyle="white";
-  ctx.fillRect(750,0,5,400);
-
-  players.forEach((p,i)=>{
-    ctx.fillStyle="white";
-    ctx.fillText(names[i], p.x, p.y);
-    ctx.fillRect(p.x, p.y+5, 30, 5); // 간단한 막대
+    t.appendChild(r);
+    tracks.appendChild(t);
   });
 }
 
-// 업데이트
-function update(){
-  if(!running) return;
+async function runAnimatedRace(){
+  createTracks();
 
-  players.forEach((p,i)=>{
-    let speed;
+  let progress = {};
+  players.forEach(p=>progress[p]=0);
 
-    if(useFixed){
-      const targetRank = fixedRanks[i];
-      speed = (players.length - targetRank) * 0.6 + Math.random();
+  let finished = false;
+  let winner = null;
+
+  while(!finished){
+    for(let p of players){
+      progress[p] += Math.random()*15;
+      if(progress[p] >= 100 && !finished){
+        finished = true;
+        winner = p;
+      }
+      document.getElementById("runner_"+p).style.width = Math.min(progress[p],100)+"%";
+    }
+    await sleep(10);
+  }
+
+  return winner;
+}
+
+function runFastRace(){
+  return players[Math.floor(Math.random()*players.length)];
+}
+
+async function startRace(){
+  // 이전 우승 UI 초기화
+  document.getElementById("celebration").classList.add("hidden");
+  document.getElementById("celebrationText").innerText = "";
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("tracks").classList.remove("hidden");
+  document.getElementById("resultSection").classList.remove("hidden"); // 진행 중에도 표시
+  document.getElementById("retryBtn").classList.add("hidden");
+
+  document.getElementById("finalTitle").innerText = "📊 진행 중...";
+
+  const totalRounds = parseInt(document.getElementById("roundInput").value);
+
+  winCount = {};
+  players.forEach(p => winCount[p]=0);
+
+  for(let round=1; round<=totalRounds; round++){
+
+    let winner;
+
+    if(round % 10 === 0){
+      winner = await runAnimatedRace();
+      await sleep(50);
     } else {
-      speed = Math.random()*4;
+      winner = runFastRace();
     }
 
-    p.x += speed;
-  });
+    winCount[winner]++;
 
-  checkFinish();
-  draw();
-  requestAnimationFrame(update);
-}
-
-// 도착 체크
-function checkFinish(){
-  players.forEach((p,i)=>{
-    if(p.x>=750 && p.rank===0){
-      p.rank = finishOrder.length+1;
-      finishOrder.push(i);
+    if(round % 10 === 0){
+      updateStackUI();
     }
-  });
-
-  if(finishOrder.length===players.length){
-    running=false;
-    showResult();
   }
+
+  updateStackUI();
+  showFinalResult();
 }
 
-// 결과
-function showResult(){
-  let txt="🏆 결과\n";
-  finishOrder.forEach((idx,i)=>{
-    if(i<3){
-      txt += `${i+1}등: ${names[idx]}\n`;
+function updateStackUI(){
+  const sorted = Object.entries(winCount).sort((a,b)=>b[1]-a[1]);
+
+  let html = '<div class="cards">';
+
+  sorted.forEach(([name,count], idx)=>{
+    let cls = "card";
+    let icon = "🎮";
+
+    if(idx===0){ cls += " top1"; icon = "🥇"; }
+    else if(idx===1){ cls += " top2"; icon = "🥈"; }
+    else if(idx===2){ cls += " top3"; icon = "🥉"; }
+
+    const blockCount = Math.floor(count / 10);
+
+    let blocks = '';
+    for(let i=0;i<blockCount;i++){
+      blocks += '<div class="block"></div>';
     }
-  });
 
-  document.getElementById("result").innerText = txt;
-
-  useFixed = false; // 1회용
-}
-
-// 시작
-function startRace(){
-  finishOrder = [];
-
-  if(useFixed){
-    setAdminNames();
-  } else {
-    resetNames();
-  }
-
-  createPlayers();
-  running = true;
-  update();
-}
-
-// 관리자 로그인
-function loginAdmin(){
-  if(prompt("비밀번호") === "1234"){
-    document.getElementById("adminPanel").style.display="block";
-    setAdminNames();
-    renderInputs();
-  }
-}
-
-// 순위 입력 UI
-function renderInputs(){
-  const box = document.getElementById("rankInputs");
-  box.innerHTML = "";
-
-  names.forEach((n,i)=>{
-    box.innerHTML += `
-      <div>
-        ${n}<br>
-        <input id="r${i}" placeholder="순위">
+    html += `
+      <div class="${cls}">
+        <div>${icon} ${name}</div>
+        <div>${count}승</div>
+        <div class="stack">${blocks}</div>
       </div>
     `;
   });
+
+  html += '</div>';
+
+  document.getElementById("result").innerHTML = html;
 }
 
-// 순위 적용
-function applyFixed(){
-  fixedRanks = [];
+function showFinalResult(){
+  document.getElementById("resultSection").classList.remove("hidden");
+  const sorted = Object.entries(winCount).sort((a,b)=>b[1]-a[1]);
+  const winner = sorted[0][0];
 
-  for(let i=0;i<names.length;i++){
-    const val = parseInt(document.getElementById("r"+i).value);
-    if(!val){
-      alert("순위 전부 입력해야 함!");
-      return;
-    }
-    fixedRanks.push(val);
+  document.getElementById("finalTitle").innerText = `🏆 최종 우승: ${winner}`;
+  document.getElementById("retryBtn").classList.remove("hidden");
+
+  showCelebration(winner);
+}
+
+function showCelebration(name){
+  const box = document.getElementById("celebration");
+  const text = document.getElementById("celebrationText");
+
+  text.innerText = `🎉 ${name} 우승!`;
+  text.style.animation = "popText 0.6s ease";
+
+  box.classList.remove("hidden");
+
+  for(let i=0;i<40;i++){
+    const f = document.createElement("div");
+    f.className = "firework";
+    f.style.left = "50%";
+    f.style.top = "50%";
+
+    const angle = Math.random()*2*Math.PI;
+    const distance = Math.random()*200;
+
+    f.style.setProperty("--x", Math.cos(angle)*distance+"px");
+    f.style.setProperty("--y", Math.sin(angle)*distance+"px");
+
+    box.appendChild(f);
+
+    setTimeout(()=>f.remove(),800);
   }
 
-  useFixed = true;
-  alert("다음 판에 적용됨!");
+  setTimeout(()=>{
+    box.classList.add("hidden");
+  },800);
 }
 
-// 초기 화면
-draw();
+function goHome(){
+  // 우승 UI 초기화
+  document.getElementById("celebration").classList.add("hidden");
+  document.getElementById("celebrationText").innerText = "";
+  document.getElementById("result").innerHTML = "";
+  document.getElementById("finalTitle").innerText = "📊 진행 중...";
+  document.getElementById("resultSection").classList.add("hidden");
+  document.getElementById("tracks").classList.add("hidden");
+  document.getElementById("startScreen").classList.remove("hidden");
+}
 </script>
 
 </body>
