@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>KST 시뮬레이션 룰렛</title>
+<title>룰렛 레이스</title>
 
 <style>
 @font-face {
@@ -106,30 +106,6 @@ button, input {
 .top2 { transform: scale(1.1); background: silver; color:#000; }
 .top3 { transform: scale(1.05); background: #cd7f32; color:#000; }
 
-</style>
-</head>
-<body>
-
-<h1>KST 시뮬레이션 룰렛</h1>
-
-<div id="startScreen" class="glass">
-  <input type="number" id="roundInput" value="1000" min="1" max="1000">
-  <button onclick="startRace()">시작</button>
-</div>
-
-<div id="tracks" class="glass hidden"></div>
-
-<div id="resultSection" class="hidden">
-  <h2 id="finalTitle">📊 진행 중...</h2>
-  <div id="result" class="glass"></div>
-  <button id="retryBtn" class="hidden" onclick="goHome()">🔄 다시 하기</button>
-</div>
-
-<div id="celebration" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:bold;z-index:999;">
-  <div id="celebrationText"></div>
-</div>
-
-<style>
 @keyframes popText {
   0% { transform: scale(0.5); opacity:0; }
   50% { transform: scale(1.2); opacity:1; }
@@ -150,6 +126,39 @@ button, input {
   to { transform: translate(var(--x), var(--y)); opacity:0; }
 }
 </style>
+</head>
+
+<body>
+
+<h1>🏁 룰렛 레이스</h1>
+
+<div id="startScreen" class="glass">
+  <input type="number" id="roundInput" value="1000" min="1" max="1000">
+  <button onclick="startRace()">시작</button>
+
+  <br>
+  <a href="https://wheelofnames.com/ko/ggq-yvj" target="_blank">
+    <button>돌림판</button>
+  </a>
+</div>
+
+     <br>
+  <a href="https://lazygyu.github.io/roulette/" target="_blank">
+    <button>마블룰렛</button>
+  </a>
+</div>
+
+<div id="tracks" class="glass hidden"></div>
+
+<div id="resultSection" class="hidden">
+  <h2 id="finalTitle">📊 진행 중...</h2>
+  <div id="result" class="glass"></div>
+  <button id="retryBtn" class="hidden" onclick="goHome()">🔄 다시 하기</button>
+</div>
+
+<div id="celebration" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:bold;z-index:999;">
+  <div id="celebrationText"></div>
+</div>
 
 <script>
 const players = ["한이","바가","라면","진상","진지","조교","제갈태윤"];
@@ -205,12 +214,11 @@ function runFastRace(){
 }
 
 async function startRace(){
-  // 이전 우승 UI 초기화
   document.getElementById("celebration").classList.add("hidden");
   document.getElementById("celebrationText").innerText = "";
   document.getElementById("startScreen").classList.add("hidden");
   document.getElementById("tracks").classList.remove("hidden");
-  document.getElementById("resultSection").classList.remove("hidden"); // 진행 중에도 표시
+  document.getElementById("resultSection").classList.remove("hidden");
   document.getElementById("retryBtn").classList.add("hidden");
 
   document.getElementById("finalTitle").innerText = "📊 진행 중...";
@@ -221,7 +229,6 @@ async function startRace(){
   players.forEach(p => winCount[p]=0);
 
   for(let round=1; round<=totalRounds; round++){
-
     let winner;
 
     if(round % 10 === 0){
@@ -277,7 +284,6 @@ function updateStackUI(){
 }
 
 function showFinalResult(){
-  document.getElementById("resultSection").classList.remove("hidden");
   const sorted = Object.entries(winCount).sort((a,b)=>b[1]-a[1]);
   const winner = sorted[0][0];
 
@@ -319,7 +325,6 @@ function showCelebration(name){
 }
 
 function goHome(){
-  // 우승 UI 초기화
   document.getElementById("celebration").classList.add("hidden");
   document.getElementById("celebrationText").innerText = "";
   document.getElementById("result").innerHTML = "";
