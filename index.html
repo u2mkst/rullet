@@ -1,413 +1,205 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-5899C1DJM0"></script>
-  <script defer src="https://umami.lazygyu.net/script.js" data-website-id="205aee0d-30b6-4c69-a053-0c72c8377be0"></script>
+<meta charset="UTF-8">
+<title>달리기 게임</title>
 
-  <title>Marble Roulette</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="apple-touch-icon" sizes="57x57" href="assets/apple-icon-57x57.png">
-  <link rel="apple-touch-icon" sizes="60x60" href="assets/apple-icon-60x60.png">
-  <link rel="apple-touch-icon" sizes="72x72" href="assets/apple-icon-72x72.png">
-  <link rel="apple-touch-icon" sizes="76x76" href="assets/apple-icon-76x76.png">
-  <link rel="apple-touch-icon" sizes="114x114" href="assets/apple-icon-114x114.png">
-  <link rel="apple-touch-icon" sizes="120x120" href="assets/apple-icon-120x120.png">
-  <link rel="apple-touch-icon" sizes="144x144" href="assets/apple-icon-144x144.png">
-  <link rel="apple-touch-icon" sizes="152x152" href="assets/apple-icon-152x152.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-icon-180x180.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/android-icon-192x192.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="96x96" href="assets/favicon-96x96.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
-  <link rel="manifest" href="assets/manifest.json">
+<style>
+body { text-align:center; background:#111; color:white; font-family:Arial; }
+canvas { background:#333; border-radius:10px; margin-top:20px; }
 
-  <meta name="msapplication-TileColor" content="#ffffff">
-  <meta name="msapplication-TileImage" content="assets/ms-icon-144x144.png">
-  <meta name="theme-color" content="#ffffff">
+button {
+  padding:10px 20px;
+  margin:5px;
+  border:none;
+  border-radius:10px;
+  background:#00c853;
+  color:white;
+  cursor:pointer;
+}
 
-  <meta name="description" content="A lucky draw by dropping marbles, made by lazygyu">
-  <meta property="og:url" content="https://lazygyu.github.io/roulette/">
-  <meta property="og:title" content="Marble Roulette">
-  <meta property="og:description" content="A lucky draw by dropping marbles, made by lazygyu">
-  <meta property="og:site_name" content="lazygyu.github.io">
-  <meta property="og:type" content="website">
+.admin { display:none; background:#222; padding:10px; margin-top:10px; }
 
-  <link rel='stylesheet' href='assets/style.scss' />
+input {
+  width:40px;
+  text-align:center;
+  margin-top:5px;
+}
+</style>
 </head>
+
 <body>
-<script type="module" src="./src/index.ts"></script>
-<script type="text/javascript">
-  window.dataLayer = window.dataLayer || [];
 
-  function gtag() {
-    dataLayer.push(arguments);
+<h1>🏃 달리기 게임</h1>
+
+<button onclick="startRace()">출발</button>
+<button onclick="loginAdmin()">👑 관리자</button>
+
+<canvas id="game" width="800" height="400"></canvas>
+
+<h2 id="result"></h2>
+
+<div class="admin" id="adminPanel">
+  <h3>관리자 모드</h3>
+  <div id="rankInputs"></div>
+  <br>
+  <button onclick="applyFixed()">순위 지정 적용</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let players = [];
+let names = ["1번","2번","3번","4번","5번"];
+let finishOrder = [];
+let running = false;
+
+let useFixed = false;
+let fixedRanks = [];
+
+// 기본 이름
+function resetNames(){
+  names = ["1번","2번","3번","4번","5번"];
+}
+
+// 관리자 이름
+function setAdminNames(){
+  names = ["한이","바가","라면 진지","진상","제갈","조교"];
+}
+
+// 플레이어 생성
+function createPlayers(){
+  players = [];
+  for(let i=0;i<names.length;i++){
+    players.push({ x:0, y:60+i*50, speed:0, rank:0 });
   }
+}
 
-  gtag('js', new Date());
-  gtag('config', 'G-5899C1DJM0');
+// 그리기
+function draw(){
+  ctx.clearRect(0,0,800,400);
 
-  function getNames() {
-    const value = document.querySelector('#in_names').value.trim();
-    return value.split(/[,\n]/g).map(v => v.trim()).filter(v => !!v);
-  }
+  ctx.fillStyle="white";
+  ctx.fillRect(750,0,5,400);
 
-  function parseName(nameStr) {
-    const weightRegex = /(\/+/);
-    const countRegex = /(\*\d+)/;
-    const hasWeight = weightRegex.test(nameStr);
-    const hasCount = countRegex.test(nameStr);
-    const name = /^\s*([^\/]+)?/.exec(nameStr)[1];
-    const weight = hasWeight ? parseInt(weightRegex.exec(nameStr)[1].replace('/', '')) : 1;
-    const count = hasCount ? parseInt(countRegex.exec(nameStr)[1].replace('*', '')) : 1;
-    return {
-      name,
-      weight,
-      count,
-    };
-  }
+  players.forEach((p,i)=>{
+    ctx.fillStyle="white";
+    ctx.fillText(names[i], p.x, p.y);
+    ctx.fillRect(p.x, p.y+5, 30, 5); // 간단한 막대
+  });
+}
 
-  function getReady() {
-    const names = getNames();
-    window.roulette.setMarbles(names);
-    ready = names.length > 0;
-    localStorage.setItem('mbr_names', names.join(','));
-    switch (winnerType) {
-      case 'first':
-        setWinnerRank(1);
-        break;
-      case 'last':
-        const total = window.roulette.getCount();
-        setWinnerRank(total);
-        break;
+// 업데이트
+function update(){
+  if(!running) return;
+
+  players.forEach((p,i)=>{
+    let speed;
+
+    if(useFixed){
+      const targetRank = fixedRanks[i];
+      speed = (players.length - targetRank) * 0.6 + Math.random();
+    } else {
+      speed = Math.random()*4;
     }
-  }
 
-  function setWinnerRank(rank) {
-    document.querySelector('#in_winningRank').value = rank;
-    window.options.winningRank = rank - 1;
-    window.roulette.setWinningRank(window.options.winningRank);
-
-    if (winnerType === 'first') {
-      document.querySelector('.btn-first-winner').classList.toggle('active', true);
-      document.querySelector('.btn-last-winner').classList.toggle('active', false);
-      document.querySelector('#in_winningRank').classList.toggle('active', false);
-    } else if (winnerType === 'last') {
-      document.querySelector('.btn-first-winner').classList.toggle('active', false);
-      document.querySelector('.btn-last-winner').classList.toggle('active', true);
-      document.querySelector('#in_winningRank').classList.toggle('active', false);
-    } else if (winnerType === 'custom') {
-      document.querySelector('.btn-first-winner').classList.toggle('active', false);
-      document.querySelector('.btn-last-winner').classList.toggle('active', false);
-      document.querySelector('#in_winningRank').classList.toggle('active', true);
-    }
-  }
-
-
-  let ready = false;
-  let winnerType = 'first';
-
-  document.addEventListener('DOMContentLoaded', () => {
-    initialize();
+    p.x += speed;
   });
 
-  function initialize() {
-    if (!window.roulette || !window.roulette.isReady) {
-      console.log('does not loaded yet');
-      setTimeout(initialize, 100);
+  checkFinish();
+  draw();
+  requestAnimationFrame(update);
+}
+
+// 도착 체크
+function checkFinish(){
+  players.forEach((p,i)=>{
+    if(p.x>=750 && p.rank===0){
+      p.rank = finishOrder.length+1;
+      finishOrder.push(i);
+    }
+  });
+
+  if(finishOrder.length===players.length){
+    running=false;
+    showResult();
+  }
+}
+
+// 결과
+function showResult(){
+  let txt="🏆 결과\n";
+  finishOrder.forEach((idx,i)=>{
+    if(i<3){
+      txt += `${i+1}등: ${names[idx]}\n`;
+    }
+  });
+
+  document.getElementById("result").innerText = txt;
+
+  useFixed = false; // 1회용
+}
+
+// 시작
+function startRace(){
+  finishOrder = [];
+
+  if(useFixed){
+    setAdminNames();
+  } else {
+    resetNames();
+  }
+
+  createPlayers();
+  running = true;
+  update();
+}
+
+// 관리자 로그인
+function loginAdmin(){
+  if(prompt("비밀번호") === "1234"){
+    document.getElementById("adminPanel").style.display="block";
+    setAdminNames();
+    renderInputs();
+  }
+}
+
+// 순위 입력 UI
+function renderInputs(){
+  const box = document.getElementById("rankInputs");
+  box.innerHTML = "";
+
+  names.forEach((n,i)=>{
+    box.innerHTML += `
+      <div>
+        ${n}<br>
+        <input id="r${i}" placeholder="순위">
+      </div>
+    `;
+  });
+}
+
+// 순위 적용
+function applyFixed(){
+  fixedRanks = [];
+
+  for(let i=0;i<names.length;i++){
+    const val = parseInt(document.getElementById("r"+i).value);
+    if(!val){
+      alert("순위 전부 입력해야 함!");
       return;
     }
-    console.log('initializing start');
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const namesFromUrl = urlParams.get('names');
-
-    if (namesFromUrl) {
-      document.querySelector('#in_names').value = namesFromUrl.replace(/,/g, '\n');
-    } else {
-      const savedNames = localStorage.getItem('mbr_names');
-      if (savedNames) {
-        document.querySelector('#in_names').value = savedNames;
-      }
-    }
-    document.querySelector('#in_names').addEventListener('input', () => {
-      getReady();
-    });
-
-    document.querySelector('#in_names').addEventListener('blur', () => {
-      const nameSource = getNames();
-      const nameSet = new Set();
-      const nameCounts = {};
-      nameSource.forEach(nameSrc => {
-        const name = parseName(nameSrc);
-        const key = name.weight > 1 ? `${name.name}/${name.weight}` : name.name;
-        if (!nameSet.has(key)) {
-          nameSet.add(key);
-          nameCounts[key] = 0;
-        }
-        nameCounts[key] += name.count;
-      });
-      const result = [];
-      Object.keys(nameCounts).forEach(key => {
-        if (nameCounts[key] > 1) {
-          result.push(`${key}*${nameCounts[key]}`);
-        } else {
-          result.push(key);
-        }
-      });
-
-      const oldValue = document.querySelector('#in_names').value;
-      const newValue = result.join(',');
-
-      if (oldValue !== newValue) {
-        document.querySelector('#in_names').value = newValue;
-        getReady();
-      }
-    });
-
-    document.querySelector('#btnShuffle').addEventListener('click', () => {
-      getReady();
-    });
-
-    document.querySelector('#btnStart').addEventListener('click', () => {
-      if (!ready) return;
-      gtag && gtag('event', 'start', {
-        'event_category': 'roulette',
-        'event_label': 'start',
-        'value': window.roulette.getCount(),
-      });
-      const names = getNames();
-      const marbles = names.map(n => {
-        const p = parseName(n);
-        return { name: p.name, count: p.count };
-      });
-      if (typeof umami !== 'undefined') {
-        umami.track('start', { count: window.roulette.getCount() });
-        marbles.forEach(m => {
-          umami.track('marble', { name: m.name, count: m.count });
-        });
-      }
-      window.roulette.start();
-      document.querySelector('#settings').classList.add('hide');
-      document.querySelector('#donate').classList.add('hide');
-    });
-
-    document.querySelector('#chkAutoRecording').addEventListener('change', (e) => {
-      window.options.autoRecording = e.target.matches(':checked');
-      window.roulette.setAutoRecording(window.options.autoRecording);
-    });
-
-    document.querySelector('#chkSkill').addEventListener('change', (e) => {
-      window.options.useSkills = e.target.matches(':checked');
-      window.roulette.setWinningRank(window.options.winningRank);
-    });
-
-    document.querySelector('#chkDarkMode').addEventListener('change', (e) => {
-      window.options.darkMode = e.target.matches(':checked');
-      window.roulette.setTheme(window.options.darkMode ? 'dark' : 'light');
-      document.documentElement.classList.toggle('light', !window.options.darkMode);
-    });
-
-    document.querySelector('#in_winningRank').addEventListener('change', (e) => {
-      const v = parseInt(e.target.value, 10);
-      winnerType = 'custom';
-      setWinnerRank(isNaN(v) ? 0 : v);
-    });
-
-    document.querySelector('.btn-last-winner').addEventListener('click', () => {
-      const total = window.roulette.getCount();
-      winnerType = 'last';
-      setWinnerRank(total);
-    });
-    document.querySelector('.btn-first-winner').addEventListener('click', () => {
-      winnerType = 'first';
-      setWinnerRank(1);
-    });
-
-    window.roulette.addEventListener('goal', () => {
-      ready = false;
-      setTimeout(() => {
-        document.querySelector('#settings').classList.remove('hide');
-        document.querySelector('#donate').classList.remove('hide');
-      }, 3000);
-    });
-
-    window.roulette.addEventListener('message', (e) => {
-      simpleToast(e.detail);
-    });
-
-    const toggleBtn = document.querySelector('#btnToggleSettings');
-    const collapsible = document.querySelector('.collapsible-rows');
-    toggleBtn.addEventListener('click', () => {
-      collapsible.classList.toggle('collapsed');
-      toggleBtn.querySelector('.toggle-arrow').textContent =
-        collapsible.classList.contains('collapsed') ? '▲' : '▼';
-    });
-
-    document.querySelector('#btnShuffle').click();
-
-    const maps = window.roulette.getMaps();
-    const mapSelector = document.querySelector('#sltMap');
-    maps.forEach((map) => {
-      const option = document.createElement('option');
-      option.value = map.index;
-      option.innerHTML = map.title;
-      option.setAttribute('data-trans', '');
-      window.translateElement(option);
-      mapSelector.append(option);
-    });
-    mapSelector.addEventListener('change', (e) => {
-      const index = e.target.value;
-      window.roulette.setMap(index);
-    });
-
-    // const checkDonateButtonLoaded = () => {
-    //   const btn = document.querySelector('span.bmc-btn-text');
-    //   if (!btn) {
-    //     setTimeout(checkDonateButtonLoaded, 100);
-    //   } else {
-    //     console.log('donation button has been loaded');
-    //     btn.setAttribute('data-trans', '');
-    //     window.translateElement(btn);
-    //   }
-    // };
-    // setTimeout(checkDonateButtonLoaded, 100);
-
-    const currentNotice = 5;
-    const noticeKey = 'lastViewedNotification';
-
-    const closeNotice = () => {
-      document.querySelector('#notice').style.display = 'none';
-      localStorage.setItem(noticeKey, currentNotice.toString());
-    };
-
-    const openNotice = () => {
-      console.log('openNotice');
-      document.querySelector('#notice').style.display = 'flex';
-    };
-
-    document.querySelector('#closeNotice').addEventListener('click', () => {
-      closeNotice();
-    });
-
-    document.querySelector('#btnNotice').addEventListener('click', () => {
-      openNotice();
-    });
-
-    function simpleToast(msg) {
-      const toast = document.createElement('div');
-      toast.classList.add('toast');
-      toast.innerHTML = msg;
-
-      if (window.translateElement) {
-        console.log('try to translate');
-        window.translateElement(toast);
-      }
-
-      document.body.appendChild(toast);
-      setTimeout(() => {
-        document.body.removeChild(toast);
-      }, 1200);
-    }
-
-    const checkNotice = () => {
-      const lastViewed = localStorage.getItem(noticeKey);
-      console.log('lastViewed', lastViewed);
-      if (lastViewed === null || Number(lastViewed) < currentNotice) {
-        openNotice();
-      }
-    };
-
-    checkNotice();
+    fixedRanks.push(val);
   }
+
+  useFixed = true;
+  alert("다음 판에 적용됨!");
+}
+
+// 초기 화면
+draw();
 </script>
-<div id="settings" class="settings">
-  <div class="right">
-    <button id="btnToggleSettings" class="btn-toggle-settings">
-      <span data-trans>Settings</span>
-      <i class="toggle-arrow">▲</i>
-    </button>
-    <div class="collapsible-rows collapsed">
-      <div class="row">
-        <label for='sltMap'>
-          <i class="icon map"></i>
-          <span data-trans>Map</span>
-        </label>
-        <select id="sltMap"></select>
-      </div>
-      <div class="row row-toggles">
-        <div class='toggle-item'>
-          <label for='chkAutoRecording'>
-            <i class="icon record"></i>
-            <span data-trans>Recording</span>
-          </label>
-          <input type="checkbox" id="chkAutoRecording" />
-        </div>
-        <div class='toggle-item'>
-          <label for='chkSkill'>
-            <i class="icon bomb"></i>
-            <span data-trans>Using skills</span>
-          </label>
-          <input type="checkbox" id="chkSkill" checked />
-        </div>
-      </div>
-      <div class="row">
-        <label>
-          <i class="icon trophy"></i>
-          <span data-trans>The winner is</span>
-        </label>
-        <div class="btn-group">
-          <button class="btn-winner btn-first-winner active" data-trans>First</button>
-          <button class="btn-winner btn-last-winner" data-trans>Last</button>
-          <input type="number" id="in_winningRank" value="1" min="1" />
-        </div>
-      </div>
-      <div class="row row-theme">
-        <div class='theme'>
-          <i class='icon sun'></i>
-          <input type='checkbox' id='chkDarkMode' checked />
-          <i class='icon moon'></i>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="left">
-    <h3 data-trans>Enter names below</h3>
-    <textarea id="in_names" placeholder="Input names separated by commas or line feed here" data-trans="placeholder">수박*2,키위*2,귤*2</textarea>
-    <div class="actions">
-      <button id="btnNotice">
-        <i class="icon megaphone"></i>
-      </button>
-      <a href='https://marblerouletteshop.com' target='_blank' id="btnShop" class='btn new' title='MarbleRoulette Shop'>
-        <img src='assets/images/marblerouletteshop.png' />
-      </a>
-      <div class="sep"></div>
-      <button id="btnShuffle">
-        <i class="icon shuffle"></i>
-        <span data-trans>Shuffle</span>
-      </button>
-      <button id="btnStart">
-        <i class="icon play"></i>
-        <span data-trans>Start</span>
-      </button>
-    </div>
-  </div>
-</div>
-<div id="notice">
-  <h1>Notice</h1>
-  <div class="notice-body">
-    <h2>커스텀 룰렛 기능 오픈!</h2>
-    <p>나만의 특별한 룰렛을 만들 수 있는 커스텀 룰렛 기능이 오픈했어요!</p>
-    <p>
-      <a href='https://marblerouletteshop.com/intro/roulette' target='_blank' class='shop-button holographic'><img
-        src='assets/images/marblerouletteshop.png' width='125' height='125' /> 룰렛 꾸미러 가기</a>
-    </p>
-  </div>
-  <div class="notice-action">
-    <button id="closeNotice" data-trans>Close</button>
-  </div>
-</div>
-<div class="copyright">&copy; 2022-2026.<a href="https://lazygyu.net" target="_blank">lazygyu</a> <span data-trans>This program is freeware and may be used freely anywhere, including in broadcasts and[...]\n</div>
+
 </body>
 </html>
